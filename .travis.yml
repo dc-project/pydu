@@ -3,10 +3,20 @@ python:
   - "2.7"
   - "3.5"
   - "3.6"
+
+sudo: false
+
+cache: pip
+
 install:
-  - pip install tox-travis
+  - pip install tox codecov
+
 script:
-  - tox
+  - tox -e $(echo py$TRAVIS_PYTHON_VERSION | tr -d .)
+
+after_success:
+  - codecov
+
 notifications:
   email:
     recipients:

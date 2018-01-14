@@ -1,6 +1,8 @@
 # coding: utf-8
 import collections
 
+from .compat import PY2
+
 
 class AttrDict(dict):
     """
@@ -129,8 +131,69 @@ class LookupDict(dict):
         return self.get(key, None)
 
 
+# https://stackoverflow.com/questions/6190331/can-i-do-an-ordered-default-dict-in-python
+class OrderedDefaultDict(collections.OrderedDict):
+    """
+    Dictionary that remembers insertion order and has default value
+    with default factory.
+
+    The default factory is called without arguments to produce
+    a new value when a key is not present, in `__getitem__` only.
+    An `OrderedDefaultDict` compares equal to a `collections.defaultdict`
+    with the same items. All remaining arguments are treated the same
+    as if they were passed to the `defaultdict` constructor,
+    including keyword arguments.
+    """
+    def __init__(self, default_factory=None, *args, **kwds):
+        if (default_factory is not None and
+           not isinstance(default_factory, collections.Callable)):
+            raise TypeError('First argument must be callable')
+        super(OrderedDefaultDict, self).__init__(*args, **kwds)
+        self.default_factory = default_factory
+
+    def __getitem__(self, key):
+        try:
+            return super(OrderedDefaultDict, self).__getitem__(key)
+        except KeyError:
+            return self.__missing__(key)
+
+    def __missing__(self, key):
+        if self.default_factory is None:
+            raise KeyError(key)
+        self[key] = value = self.default_factory()
+        return value
+
+    def __reduce__(self):
+        if self.default_factory is None:
+            args = tuple()
+        else:
+            args = self.default_factory,
+        return type(self), args, None, None, self.items()
+
+    def copy(self):
+        return self.__copy__()
+
+    def __copy__(self):
+        return self.__class__(self.default_factory, self)
+
+    if PY2:
+        def __deepcopy__(self, memo):
+            import copy
+            return self.__class__(self.default_factory, copy.deepcopy(self.items()))
+    else:
+        def __deepcopy__(self, memo):
+            import copy
+            return self.__class__(self.default_factory, copy.deepcopy(iter(self.items())))
+
+    def __repr__(self):
+        return 'OrderedDefaultDict({default_factory}, {repr})'.format(
+            default_factory=self.default_factory,
+            repr=super(OrderedDefaultDict, self).__repr__()
+        )
+
+
 def attrify(obj):
-    if isinstance(obj, (list, tuple)):
+    if isinstance(obj, list):
         for i, v in enumerate(obj):
             obj[i] = attrify(v)
         return obj
